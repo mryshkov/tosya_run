@@ -51,7 +51,7 @@ int main(){
         for (char c : line) {
             row.push_back(c);
         }
-        tree.push_back(row);
+        tree_light.push_back(row);
     }
 
     // error in reading 
@@ -137,7 +137,6 @@ void DrawMap(vector<vector<char>> map, vector<vector<char>> tree, vector<vector<
             const auto& col = map[i][j];
             if (col == '#') {
                 DrawTree(tree, x, y);
-                //DrawRectangle(x, y, TILE, BLUE);
                 x += 32;
             }
             else if (col == ' ') {
