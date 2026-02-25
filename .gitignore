@@ -39,3 +39,9 @@
 
 # debug information files
 *.dwo
+
+build/
+.vscode/
+
+map_tosya.txt
+map_1.txt
