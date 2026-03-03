@@ -3,7 +3,6 @@
 #include <fstream>
 #include "raylib.h"
 #include <cstdlib>
-#include <ctime>
 
 #define TILE 32, 32
 #define WNDWWIDTH 1024
@@ -19,6 +18,11 @@ struct memoryCell {                       // for the cell being overwritten by p
     char value = 0;
 };
 
+struct memoryCell2 {
+    memoryCell m1;
+    memoryCell m2;
+};
+
 struct player {
     int x;
     int y;
@@ -32,13 +36,13 @@ void DrawDownwardPortal(MAP portal_half, int X, int Y);
 
 void DrawDownwardPortal(MAP portal_half, int X, int Y);
 
-void DrawGrass(MAP grass, int X, int y, bool stones);
+void DrawGrass(MAP grass, MAP grass_flowers, int X, int y, bool flowers);
 
 void DrawGrassUnderTree(MAP grass, int X, int Y);
 
-void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, player Tosya);
+void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, Texture2D tosya_tx);
 
-void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers);
+void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers, MAP portal_half);
 
 
 int main(){
@@ -69,16 +73,25 @@ int main(){
     fstream file_portal_half("assets/portal_half.txt");
     MAP portal_half;
 
+    Image tosya_img = LoadImage("assets/tosya.png");
+    Texture2D tosya_tx = LoadTextureFromImage(tosya_img);
+    UnloadImage(tosya_img);
+    
 
-    memoryCell mem1, mem2;
+
+    memoryCell mem1, mem2, mem3, mem4;
+    memoryCell2 memGroup1 = {mem1, mem2}, memGroup2 = {mem3, mem4};
     int lastMem = 1;
+    int lastMem2 = 3;
 
-    player Tosya = {3, 1};
+    //               y,  x
+    player Player = {3,  1};
+    player Tosya  = {13, 30};
     float moveDelay = 0.3f;
     float timer = 0;
     bool canMove = true;
 
-    // error in reading 
+ // error in reading 
     if (
         !file_tree.is_open() || !file_tree_apple.is_open() || !file_map.is_open() ||
         !file_star.is_open() || !file_tree_light.is_open() || !file_grass.is_open() ||
@@ -192,86 +205,85 @@ int main(){
     file_sausage.close();}
     
 
-    mem1.value = map[Tosya.x][Tosya.y];
-    lastMem = 1;
+    mem1.value = map[Player.x][Player.y];
+    mem3.value = map[Tosya.x][Tosya.y];
     
  // game cycle
     while (!WindowShouldClose()) {
         BeginDrawing();
-        ClearBackground(DARKGREEN);
 
      // map drawing
-        DrawMapBackground(map_background, grass, grass_tree, grass_flowers);
-        DrawMap(map, tree, tree_light, tree_apple, star, sausage, grass, grass_flowers, grass_tree, portal_half, Tosya);
+        DrawMapBackground(map_background, grass, grass_tree, grass_flowers, portal_half);
+        DrawMap(map, tree, tree_light, tree_apple, star, sausage, grass, grass_flowers, grass_tree, portal_half, tosya_tx);
         
-     // spawning Tosya
-     // mem1.value = map[Tosya.x][Tosya.y];
-        map[Tosya.x][Tosya.y] = 'p';
+     // spawning Player
+        map[Player.x][Player.y] = 'p';
+        map[Tosya.x][Tosya.y]   = 'T';
         
 
-     // moving logic                  checks for walls
+     // moving logic                checks for walls
         if (canMove) {
-            if (IsKeyDown(KEY_W) && map[Tosya.x-1][Tosya.y] != '#' && map[Tosya.x-1][Tosya.y] != 'a') {
+            if (IsKeyDown(KEY_W) && map[Player.x-1][Player.y] != '#' && map[Player.x-1][Player.y] != 'a') {
 
                 if (lastMem == 1) {
-                    mem2 = {Tosya.x-1, Tosya.y, map[Tosya.x-1][Tosya.y]};
-                    map[Tosya.x][Tosya.y] = mem1.value;
-                    Tosya.x -= 1;
+                    mem2 = {Player.x-1, Player.y, map[Player.x-1][Player.y]};
+                    map[Player.x][Player.y] = mem1.value;
+                    Player.x -= 1;
                     lastMem = 2;
                 }
                 else {
-                    mem1 = {Tosya.x-1, Tosya.y, map[Tosya.x-1][Tosya.y]};
-                    map[Tosya.x][Tosya.y] = mem2.value;
-                    Tosya.x -= 1;
+                    mem1 = {Player.x-1, Player.y, map[Player.x-1][Player.y]};
+                    map[Player.x][Player.y] = mem2.value;
+                    Player.x -= 1;
                     lastMem = 1;
                 }
 
             }
-            if (IsKeyDown(KEY_S) && map[Tosya.x+1][Tosya.y] != '#' && map[Tosya.x+1][Tosya.y] != 'a') {
+            if (IsKeyDown(KEY_S) && map[Player.x+1][Player.y] != '#' && map[Player.x+1][Player.y] != 'a') {
 
                 if (lastMem == 1) {
-                    mem2 = {Tosya.x+1, Tosya.y, map[Tosya.x+1][Tosya.y]};
-                    map[Tosya.x][Tosya.y] = mem1.value;
-                    Tosya.x += 1;
+                    mem2 = {Player.x+1, Player.y, map[Player.x+1][Player.y]};
+                    map[Player.x][Player.y] = mem1.value;
+                    Player.x += 1;
                     lastMem = 2;
                 }
                 else {
-                    mem1 = {Tosya.x+1, Tosya.y, map[Tosya.x+1][Tosya.y]};
-                    map[Tosya.x][Tosya.y] = mem2.value;
-                    Tosya.x += 1;
+                    mem1 = {Player.x+1, Player.y, map[Player.x+1][Player.y]};
+                    map[Player.x][Player.y] = mem2.value;
+                    Player.x += 1;
                     lastMem = 1;
                 }
 
             }
-            if (IsKeyDown(KEY_A) && map[Tosya.x][Tosya.y-1] != '#' && map[Tosya.x][Tosya.y-1] != 'a') {
+            if (IsKeyDown(KEY_A) && map[Player.x][Player.y-1] != '#' && map[Player.x][Player.y-1] != 'a') {
 
                 if (lastMem == 1) {
-                    mem2 = {Tosya.x, Tosya.y-1, map[Tosya.x][Tosya.y-1]};
-                    map[Tosya.x][Tosya.y] = mem1.value;
-                    Tosya.y -= 1;
+                    mem2 = {Player.x, Player.y-1, map[Player.x][Player.y-1]};
+                    map[Player.x][Player.y] = mem1.value;
+                    Player.y -= 1;
                     lastMem = 2;
                 }
                 else {
-                    mem1 = {Tosya.x, Tosya.y-1, map[Tosya.x][Tosya.y-1]};
-                    map[Tosya.x][Tosya.y] = mem2.value;
-                    Tosya.y -= 1;
+                    mem1 = {Player.x, Player.y-1, map[Player.x][Player.y-1]};
+                    map[Player.x][Player.y] = mem2.value;
+                    Player.y -= 1;
                     
                     lastMem = 1;
                 }
 
             }
-            if (IsKeyDown(KEY_D) && map[Tosya.x][Tosya.y+1] != '#' && map[Tosya.x][Tosya.y+1] != 'a') {
+            if (IsKeyDown(KEY_D) && map[Player.x][Player.y+1] != '#' && map[Player.x][Player.y+1] != 'a') {
 
                 if (lastMem == 1) {
-                    mem2 = {Tosya.x, Tosya.y+1, map[Tosya.x][Tosya.y+1]};
-                    map[Tosya.x][Tosya.y] = mem1.value;
-                    Tosya.y += 1;
+                    mem2 = {Player.x, Player.y+1, map[Player.x][Player.y+1]};
+                    map[Player.x][Player.y] = mem1.value;
+                    Player.y += 1;
                     lastMem = 2;
                 }
                 else {
-                    mem1 = {Tosya.x, Tosya.y+1, map[Tosya.x][Tosya.y+1]};
-                    map[Tosya.x][Tosya.y] = mem2.value;
-                    Tosya.y += 1;
+                    mem1 = {Player.x, Player.y+1, map[Player.x][Player.y+1]};
+                    map[Player.x][Player.y] = mem2.value;
+                    Player.y += 1;
                     
                     lastMem = 1;
                 }
@@ -286,6 +298,8 @@ int main(){
         }
         EndDrawing();
     }
+    UnloadTexture(tosya_tx);
+
     CloseWindow();
 
     
@@ -302,54 +316,54 @@ void DrawTree(MAP tree, int X, int Y){
             }
             // base tree 
             else if (col == '1') {
-                DrawRectangle(x, y, 2, 2, Color{62, 126, 14, 255});
+                DrawRectangle(x, y, 1, 1, Color{62, 126, 14, 255});
                 x += 1;
             }
             else if (col == '2') {
-                DrawRectangle(x, y, 2, 2, Color{122, 190, 70, 255});  
+                DrawRectangle(x, y, 1, 1, Color{122, 190, 70, 255});  
                 x += 1;
             }
             else if (col == '3') {
-                DrawRectangle(x, y, 2, 2, Color{84, 171, 16, 255});   
+                DrawRectangle(x, y, 1, 1, Color{84, 171, 16, 255});   
                 x += 1;
             }
             else if (col == '4') {
-                DrawRectangle(x, y, 2, 2, Color{21, 80, 47, 255});    
+                DrawRectangle(x, y, 1, 1, Color{21, 80, 47, 255});    
                 x += 1;
             }
             // base light tree
             else if (col == 'q') {
-                DrawRectangle(x, y, 2, 2, Color{74, 145, 19, 255});
+                DrawRectangle(x, y, 1, 1, Color{74, 145, 19, 255});
                 x += 1;
             }
             else if (col == 'e') {
-                DrawRectangle(x, y, 2, 2, Color{112, 169, 69, 255});
+                DrawRectangle(x, y, 1, 1, Color{112, 169, 69, 255});
                 x += 1;
             }
             else if (col == 'r') {
-                DrawRectangle(x, y, 2, 2, Color{25, 96, 56, 255});
+                DrawRectangle(x, y, 1, 1, Color{25, 96, 56, 255});
                 x += 1;
             }
             // tree trunk
             else if (col == '5') {
-                DrawRectangle(x, y, 2, 2, Color{71, 29, 43, 255});
+                DrawRectangle(x, y, 1, 1, Color{71, 29, 43, 255});
                 x += 1;
             }
             else if (col == '6') {
-                DrawRectangle(x, y, 2, 2, Color{140, 67, 78, 255});
+                DrawRectangle(x, y, 1, 1, Color{140, 67, 78, 255});
                 x += 1;
             }
             else if (col == '7') {
-                DrawRectangle(x, y, 2, 2, Color{113, 47, 54, 255});
+                DrawRectangle(x, y, 1, 1, Color{113, 47, 54, 255});
                 x += 1;
             }
             // apple
             else if (col == '8') {
-                DrawRectangle(x, y, 2, 2, Color{183, 22, 37, 255});
+                DrawRectangle(x, y, 1, 1, Color{183, 22, 37, 255});
                 x += 1;
             }
             else if (col == '9') {
-                DrawRectangle(x, y, 2, 2, Color{238, 121, 132, 255});
+                DrawRectangle(x, y, 1, 1, Color{238, 121, 132, 255});
                 x += 1;
             }
         }
@@ -424,6 +438,7 @@ void DrawSausage(MAP sausage, int X, int Y) {
 }
 
 void DrawUpwardPortal(MAP portal_half, int X, int Y) {
+ // same, as Downward Portal, but flipped upside down
     int x = X+31, y = Y+32;
     for (const auto& row : portal_half) {
         x = X+31;
@@ -506,7 +521,6 @@ void DrawGrassUnderTree(MAP grass, int X, int Y) {
             if (col == ' ') {
                 x += 2;
             }
-            // base tree 
             else if (col == '1') {
                 DrawRectangle(x, y, 2, 2, Color{62, 157, 53, 255});
                 x += 2;
@@ -536,15 +550,15 @@ void DrawGrassUnderTree(MAP grass, int X, int Y) {
     }
 }
 
-void DrawGrass(MAP grass, int X, int Y, bool stones) {
+void DrawGrass(MAP grass, MAP grass_flowers, int X, int Y, bool flowers) {
     int x = X, y = Y;
+    if (flowers) grass = grass_flowers;
     for (const auto& row : grass) {
         x = X;
         for (const auto& col : row) {
             if (col == ' ') {
                 x += 2;
             }
-            // base tree 
             else if (col == '1') {
                 DrawRectangle(x, y, 2, 2, Color{62, 157, 53, 255});
                 x += 2;
@@ -557,12 +571,34 @@ void DrawGrass(MAP grass, int X, int Y, bool stones) {
                 DrawRectangle(x, y, 2, 2, Color{61, 139, 53, 255});   
                 x += 2;
             }
+         // flowers
+            else if (col == 'W') {
+                DrawRectangle(x, y, 2, 2, WHITE);
+                x += 2;
+            }
+            else if (col == 'Y') {
+                DrawRectangle(x, y, 2, 2, Color{241, 218, 16, 255});
+                x += 2;
+            }
+         // stones
+            else if (col == '4') {
+                DrawRectangle(x, y, 2, 2, Color{115, 115, 115, 255});
+                x += 2;
+            }
+            else if (col == '5') {
+                DrawRectangle(x, y, 2, 2, Color{131, 131, 131, 255});
+                x += 2;
+            }
+            else if (col == '6') {
+                DrawRectangle(x, y, 2, 2, Color{98, 98, 98, 255});
+                x += 2;
+            }
         }
         y += 2;
     }
 }
 
-void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, player Tosya){
+void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, Texture2D tosya_tx) {
     int x = 0, y = 0;
 
     for (int i = 0; i < map.size(); i++) {
@@ -572,17 +608,17 @@ void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sa
         for (int j = 0; j < row.size(); j++) {
 
             const auto& col = row[j];
-            
 
-            if (col == '#') {
+            if (col == ' ') {
+                x += 32;
+            }
+            
+            else if (col == '#') {
                 DrawTree(tree, x, y);
                 x += 32;
             }
             else if (col == 'a') {
                 DrawTree(tree_apple, x, y);
-                x += 32;
-            }
-            else if (col == ' ') {
                 x += 32;
             }
             else if (col == '%') {
@@ -593,27 +629,26 @@ void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sa
                 DrawStar(star, x, y);
                 x += 32;
             }
-            else if (col == 't' || col == 'd') {
-                DrawDownwardPortal(portal_half, x, y);
-                x += 32;
-            }
-            else if (col == 'T' || col == 'u') {
-                DrawUpwardPortal(portal_half, x, y);
+            else if (col == 't') {
                 x += 32;
             }
             else if (col == 'p') {
                 DrawSausage(sausage, x, y);
                 x+=32;
             }
+            else if (col == 'T') {
+                DrawTexture(tosya_tx, x, y, WHITE);
+                x += 32;
+            }
         }
         y += 32;
     }
 }
 
-void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers) {
+void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers, MAP portal_half) {
     int x = 0, y = 0;
-
     for (int i = 0; i < map_background.size(); i++) {
+
         const auto& row = map_background[i];
         x = 0;
 
@@ -622,11 +657,31 @@ void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_
             const auto& col = row[j];
             
             if (col == 'g') {
-                DrawGrass(grass, x, y, false);
+             // randomize grass rendering
+                srand(y + x + y^y/4);
+                bool variation = ((rand() % 4) + 1) < 4 ? false : true;
+
+                DrawGrass(grass, grass_flowers, x, y, variation);
                 x += 32;
             }
-            if (col == 't') {
+            else if (col == 't') {
                 DrawGrassUnderTree(grass_tree, x, y);
+                x += 32;
+            }
+            else if (col == 'u') {
+                srand(y + x + y^y/4);
+                bool variation = ((rand() % 4) + 1) < 4 ? false : true;
+
+                DrawGrass(grass, grass_flowers, x, y, variation);
+                DrawUpwardPortal(portal_half, x, y);
+                x += 32;
+            }
+            else if (col == 'd') {
+                srand(y + x + y^y/4);
+                bool variation = ((rand() % 4) + 1) < 4 ? false : true;
+
+                DrawGrass(grass, grass_flowers, x, y, variation);
+                DrawDownwardPortal(portal_half, x, y);
                 x += 32;
             }
         }
