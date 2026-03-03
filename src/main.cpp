@@ -3,6 +3,7 @@
 #include <fstream>
 #include "raylib.h"
 #include <cstdlib>
+#include <ctime>
 
 #define TILE 32, 32
 #define WNDWWIDTH 1024
@@ -27,11 +28,17 @@ void DrawTree(MAP tree, int x, int y);
 
 void DrawStar(MAP star, int X, int Y);
 
-void Draw(MAP tree, MAP star, MAP tree_light, char col, int x, int y);
+void DrawDownwardPortal(MAP portal_half, int X, int Y);
 
-void DrawPortal(MAP portal_half, int X, int Y, string rotation);
+void DrawDownwardPortal(MAP portal_half, int X, int Y);
+
+void DrawGrass(MAP grass, int X, int y, bool stones);
+
+void DrawGrassUnderTree(MAP grass, int X, int Y);
 
 void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, player Tosya);
+
+void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers);
 
 
 int main(){
@@ -41,6 +48,8 @@ int main(){
 
     fstream file_map("assets/map.txt");
     MAP map;
+    fstream file_map_background("assets/map_background.txt");
+    MAP map_background;
     fstream file_tree("assets/tree.txt");
     MAP tree;
     fstream file_tree_light("assets/tree_light.txt");
@@ -87,6 +96,14 @@ int main(){
             row.push_back(c);
         }
         map.push_back(row);
+    }
+
+    while(getline(file_map_background, line)) {
+        vector<char> row;
+        for (char c : line) {
+            row.push_back(c);
+        }
+        map_background.push_back(row);
     }
 
  // object reading
@@ -184,6 +201,7 @@ int main(){
         ClearBackground(DARKGREEN);
 
      // map drawing
+        DrawMapBackground(map_background, grass, grass_tree, grass_flowers);
         DrawMap(map, tree, tree_light, tree_apple, star, sausage, grass, grass_flowers, grass_tree, portal_half, Tosya);
         
      // spawning Tosya
@@ -193,7 +211,7 @@ int main(){
 
      // moving logic                  checks for walls
         if (canMove) {
-            if (IsKeyDown(KEY_W) && (map[Tosya.x-1][Tosya.y] != '#' || map[Tosya.x-1][Tosya.y] != 'a')) {
+            if (IsKeyDown(KEY_W) && map[Tosya.x-1][Tosya.y] != '#' && map[Tosya.x-1][Tosya.y] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Tosya.x-1, Tosya.y, map[Tosya.x-1][Tosya.y]};
@@ -209,7 +227,7 @@ int main(){
                 }
 
             }
-            if (IsKeyDown(KEY_S) && (map[Tosya.x+1][Tosya.y] != '#' || map[Tosya.x+1][Tosya.y] != 'a')) {
+            if (IsKeyDown(KEY_S) && map[Tosya.x+1][Tosya.y] != '#' && map[Tosya.x+1][Tosya.y] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Tosya.x+1, Tosya.y, map[Tosya.x+1][Tosya.y]};
@@ -225,7 +243,7 @@ int main(){
                 }
 
             }
-            if (IsKeyDown(KEY_A) && (map[Tosya.x][Tosya.y-1] != '#' || map[Tosya.x][Tosya.y-1] != 'a')) {
+            if (IsKeyDown(KEY_A) && map[Tosya.x][Tosya.y-1] != '#' && map[Tosya.x][Tosya.y-1] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Tosya.x, Tosya.y-1, map[Tosya.x][Tosya.y-1]};
@@ -242,7 +260,7 @@ int main(){
                 }
 
             }
-            if (IsKeyDown(KEY_D) && (map[Tosya.x][Tosya.y+1] != '#' || map[Tosya.x][Tosya.y+1] != 'a')) {
+            if (IsKeyDown(KEY_D) && map[Tosya.x][Tosya.y+1] != '#' && map[Tosya.x][Tosya.y+1] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Tosya.x, Tosya.y+1, map[Tosya.x][Tosya.y+1]};
@@ -480,9 +498,72 @@ void DrawDownwardPortal(MAP portal_half, int X, int Y){
     }
 }
 
+void DrawGrassUnderTree(MAP grass, int X, int Y) {
+    int x = X, y = Y;
+    for (const auto& row : grass) {
+        x = X;
+        for (const auto& col : row) {
+            if (col == ' ') {
+                x += 2;
+            }
+            // base tree 
+            else if (col == '1') {
+                DrawRectangle(x, y, 2, 2, Color{62, 157, 53, 255});
+                x += 2;
+            }
+            else if (col == '2') {
+                DrawRectangle(x, y, 2, 2, Color{72, 183, 63, 255});  
+                x += 2;
+            }
+            else if (col == '3') {
+                DrawRectangle(x, y, 2, 2, Color{39, 101, 36, 255});   
+                x += 2;
+            }
+            else if (col == '4') {
+                DrawRectangle(x, y, 2, 2, Color{61, 139, 53, 255});    
+                x += 2;
+            }
+            else if (col == '5') {
+                DrawRectangle(x, y, 2, 2, Color{38, 84, 35, 255});    
+                x += 2;
+            }
+            else if (col == '6') {
+                DrawRectangle(x, y, 2, 2, Color{27, 56, 25, 255});    
+                x += 2;
+            }
+        }
+        y += 2;
+    }
+}
+
+void DrawGrass(MAP grass, int X, int Y, bool stones) {
+    int x = X, y = Y;
+    for (const auto& row : grass) {
+        x = X;
+        for (const auto& col : row) {
+            if (col == ' ') {
+                x += 2;
+            }
+            // base tree 
+            else if (col == '1') {
+                DrawRectangle(x, y, 2, 2, Color{62, 157, 53, 255});
+                x += 2;
+            }
+            else if (col == '2') {
+                DrawRectangle(x, y, 2, 2, Color{72, 183, 63, 255});  
+                x += 2;
+            }
+            else if (col == '3') {
+                DrawRectangle(x, y, 2, 2, Color{61, 139, 53, 255});   
+                x += 2;
+            }
+        }
+        y += 2;
+    }
+}
+
 void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, player Tosya){
     int x = 0, y = 0;
-
 
     for (int i = 0; i < map.size(); i++) {
         const auto& row = map[i];
@@ -523,6 +604,30 @@ void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sa
             else if (col == 'p') {
                 DrawSausage(sausage, x, y);
                 x+=32;
+            }
+        }
+        y += 32;
+    }
+}
+
+void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers) {
+    int x = 0, y = 0;
+
+    for (int i = 0; i < map_background.size(); i++) {
+        const auto& row = map_background[i];
+        x = 0;
+
+        for (int j = 0; j < row.size(); j++) {
+
+            const auto& col = row[j];
+            
+            if (col == 'g') {
+                DrawGrass(grass, x, y, false);
+                x += 32;
+            }
+            if (col == 't') {
+                DrawGrassUnderTree(grass_tree, x, y);
+                x += 32;
             }
         }
         y += 32;
