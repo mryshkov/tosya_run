@@ -3,24 +3,27 @@
 #include <fstream>
 #include "raylib.h"
 #include <cstdlib>
+#include <cmath>
+#include <queue>
+#include <algorithm>
+
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
 
 #define TILE 32, 32
-#define WNDWWIDTH 1024
-#define WNDWHEIGHT 576
+#define INF 1e9
+#define WIDTH 1024
+#define HEIGHT 576
 #define MAP vector<vector<char>>
 
 using namespace std;
 
 
-struct memoryCell {                       // for the cell being overwritten by player
+struct memoryCell {
     int x = 0;
     int y = 0;
     char value = 0;
-};
-
-struct memoryCell2 {
-    memoryCell m1;
-    memoryCell m2;
 };
 
 struct player {
@@ -28,70 +31,97 @@ struct player {
     int y;
 };
 
-void DrawTree(MAP tree, int x, int y);
+struct retBfs {
+    int dist;
+    vector<player> finalMoves;
+};
 
-void DrawStar(MAP star, int X, int Y);
 
-void DrawDownwardPortal(MAP portal_half, int X, int Y);
+    // initializing sprites
+    fstream file_map           ("assets/map.txt");
+    MAP     map;
+    fstream file_map_background("assets/map_background.txt");
+    MAP     map_background;
+    fstream file_tree          ("assets/tree.txt");
+    MAP     tree;
+    fstream file_tree_light    ("assets/tree_light.txt");
+    MAP     tree_light;
+    fstream file_tree_apple    ("assets/tree_apple.txt");
+    MAP     tree_apple;
+    fstream file_star          ("assets/star.txt");
+    MAP     star;
+    fstream file_sausage       ("assets/player.txt");
+    MAP     sausage;
+    fstream file_grass         ("assets/grass.txt");
+    MAP     grass;
+    fstream file_grass_flowers ("assets/grass_flowers.txt");
+    MAP     grass_flowers;
+    fstream file_grass_for_tree("assets/grass_for_tree.txt");
+    MAP     grass_tree;
+    fstream file_portal_half   ("assets/portal_half.txt");
+    MAP     portal_half;
 
-void DrawDownwardPortal(MAP portal_half, int X, int Y);
 
-void DrawGrass(MAP grass, MAP grass_flowers, int X, int y, bool flowers);
+vector<player> FindStars();
 
-void DrawGrassUnderTree(MAP grass, int X, int Y);
+player TosyaLookAround(float startX, float startY, float maxRange);
 
-void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, Texture2D tosya_tx);
+retBfs bfs(MAP &map, int startX, int startY, int finishX, int finishY);
 
-void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers, MAP portal_half);
+void DrawTree(int x, int y, bool apples, bool isLight);
+
+void DrawStar(int X, int Y);
+
+void DrawDownwardPortal(int X, int Y);
+
+void DrawDownwardPortal(int X, int Y);
+
+void DrawGrass(int X, int y, bool flowers);
+
+void DrawGrassUnderTree(int X, int Y);
+
+void DrawMap(Texture2D tosya_tx);
+
+void DrawMapBackground();
+
+bool isGameLost(player Tosya, player Player);
+
+bool isGameWon(char mem1, char mem2, int lastMem);
+
+void DrawGameLost();
+
+void DrawGameWon();
 
 
 int main(){
-    InitWindow(WNDWWIDTH, WNDWHEIGHT, "Tosya RUN");
+    InitWindow(WIDTH, HEIGHT, "Tosya RUN");
     SetTargetFPS(60);
     string line;
-
-    fstream file_map("assets/map.txt");
-    MAP map;
-    fstream file_map_background("assets/map_background.txt");
-    MAP map_background;
-    fstream file_tree("assets/tree.txt");
-    MAP tree;
-    fstream file_tree_light("assets/tree_light.txt");
-    MAP tree_light;
-    fstream file_tree_apple("assets/tree_apple.txt");
-    MAP tree_apple;
-    fstream file_star("assets/star.txt");
-    MAP star;
-    fstream file_sausage("assets/player.txt");
-    MAP sausage;
-    fstream file_grass("assets/grass.txt");
-    MAP grass;
-    fstream file_grass_flowers("assets/grass_flowers.txt");
-    MAP grass_flowers;
-    fstream file_grass_for_tree("assets/grass_for_tree.txt");
-    MAP grass_tree;
-    fstream file_portal_half("assets/portal_half.txt");
-    MAP portal_half;
 
     Image tosya_img = LoadImage("assets/tosya.png");
     Texture2D tosya_tx = LoadTextureFromImage(tosya_img);
     UnloadImage(tosya_img);
-    
-
 
     memoryCell mem1, mem2, mem3, mem4;
-    memoryCell2 memGroup1 = {mem1, mem2}, memGroup2 = {mem3, mem4};
     int lastMem = 1;
     int lastMem2 = 3;
 
     //               y,  x
     player Player = {3,  1};
     player Tosya  = {13, 30};
-    float moveDelay = 0.3f;
+    float logicDelay = 0.3f;
     float timer = 0;
     bool canMove = true;
+    vector<player> stars;
+    vector<player> starsFound;
+    int collectedStarsCount = 0;
+    player lastSeenPlayer = {0, 0};
+    player currentVision = {-1, -1};
+    int dist;
+    vector<player> finalMoves(1, player{0, 0});
 
- // error in reading 
+
+    // error in reading 
     if (
         !file_tree.is_open() || !file_tree_apple.is_open() || !file_map.is_open() ||
         !file_star.is_open() || !file_tree_light.is_open() || !file_grass.is_open() ||
@@ -102,7 +132,7 @@ int main(){
         return -1;
     }
 
- // map reading
+    // map reading
     while(getline(file_map, line)) {
         vector<char> row;
         for (char c : line) {
@@ -119,7 +149,7 @@ int main(){
         map_background.push_back(row);
     }
 
- // object reading
+    // object reading
     while(getline(file_tree, line)) {
         vector<char> row;
         for (char c : line) {
@@ -192,7 +222,7 @@ int main(){
         portal_half.push_back(row);
     }
 
- // closing all open files
+    // closing all open files
     {file_map.close();
     file_tree.close();
     file_tree_light.close();
@@ -204,26 +234,23 @@ int main(){
     file_grass_for_tree.close();
     file_sausage.close();}
     
-
     mem1.value = map[Player.x][Player.y];
     mem3.value = map[Tosya.x][Tosya.y];
-    
- // game cycle
-    while (!WindowShouldClose()) {
-        BeginDrawing();
 
-     // map drawing
-        DrawMapBackground(map_background, grass, grass_tree, grass_flowers, portal_half);
-        DrawMap(map, tree, tree_light, tree_apple, star, sausage, grass, grass_flowers, grass_tree, portal_half, tosya_tx);
-        
-     // spawning Player
+    stars = FindStars();
+    
+    // game cycle
+    while (!WindowShouldClose()) {
+        // spawning Player
         map[Player.x][Player.y] = 'p';
         map[Tosya.x][Tosya.y]   = 'T';
         
-
-     // moving logic                checks for walls
+        
         if (canMove) {
-            if (IsKeyDown(KEY_W) && map[Player.x-1][Player.y] != '#' && map[Player.x-1][Player.y] != 'a') {
+            // ============================================================================================
+            //          moving logic for player           checks for walls                                 
+            // ============================================================================================
+            if (!isGameWon(mem1.value, mem2.value, lastMem) && !isGameLost(Tosya, Player) && IsKeyDown(KEY_W) && map[Player.x-1][Player.y] != '#' && map[Player.x-1][Player.y] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Player.x-1, Player.y, map[Player.x-1][Player.y]};
@@ -239,7 +266,7 @@ int main(){
                 }
 
             }
-            if (IsKeyDown(KEY_S) && map[Player.x+1][Player.y] != '#' && map[Player.x+1][Player.y] != 'a') {
+            if (!isGameWon(mem1.value, mem2.value, lastMem) && !isGameLost(Tosya, Player) && IsKeyDown(KEY_S) && map[Player.x+1][Player.y] != '#' && map[Player.x+1][Player.y] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Player.x+1, Player.y, map[Player.x+1][Player.y]};
@@ -255,7 +282,7 @@ int main(){
                 }
 
             }
-            if (IsKeyDown(KEY_A) && map[Player.x][Player.y-1] != '#' && map[Player.x][Player.y-1] != 'a') {
+            if (!isGameWon(mem1.value, mem2.value, lastMem) && !isGameLost(Tosya, Player) && IsKeyDown(KEY_A) && map[Player.x][Player.y-1] != '#' && map[Player.x][Player.y-1] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Player.x, Player.y-1, map[Player.x][Player.y-1]};
@@ -272,7 +299,7 @@ int main(){
                 }
 
             }
-            if (IsKeyDown(KEY_D) && map[Player.x][Player.y+1] != '#' && map[Player.x][Player.y+1] != 'a') {
+            if (!isGameWon(mem1.value, mem2.value, lastMem) && !isGameLost(Tosya, Player) && IsKeyDown(KEY_D) && map[Player.x][Player.y+1] != '#' && map[Player.x][Player.y+1] != 'a') {
 
                 if (lastMem == 1) {
                     mem2 = {Player.x, Player.y+1, map[Player.x][Player.y+1]};
@@ -289,26 +316,224 @@ int main(){
                 }
             }
 
-            timer = moveDelay;
+            map[Player.x][Player.y] = 'p';
+
+
+            // check if star is collected
+            if (starsFound.size() < stars.size()) {
+                for (const auto& star : stars) {
+                    if (Player.x == star.x && Player.y == star.y) {
+                        starsFound.push_back(star);
+                        collectedStarsCount++;
+                    }
+                }
+                for (int i = 0; i < starsFound.size(); i++) {
+                    const auto& starFound = starsFound[i];
+
+                    if (map[starFound.x][starFound.y] == '*') {
+                        map[0][31-i] = '*';
+                        map[starFound.x][starFound.y] = ' ';
+                    }
+                }
+            }
+
+            // ============================================================================================
+            //                                    moving logic for tosya                                   
+            // ============================================================================================
+            currentVision = TosyaLookAround(Tosya.y, Tosya.x, 20);
+
+            if (currentVision.x != -1 && currentVision.y != -1) {
+                lastSeenPlayer = currentVision;
+            }
+            
+            if (lastSeenPlayer.x != 0 && lastSeenPlayer.y != 0) {
+                retBfs result = bfs(map, Tosya.y, Tosya.x, lastSeenPlayer.y, lastSeenPlayer.x);
+                dist = result.dist;
+                finalMoves = result.finalMoves;
+
+                if (!finalMoves.empty()){
+                    if (lastMem2 == 3) {
+                        mem4.value = map[finalMoves[0].x][finalMoves[0].y];
+                        map[Tosya.x][Tosya.y] = mem3.value;
+
+                        Tosya.x = finalMoves[0].x;
+                        Tosya.y = finalMoves[0].y;
+
+                        lastMem2 = 4;
+                    }
+                    else {
+                        mem3.value = map[finalMoves[0].x][finalMoves[0].y];
+                        map[Tosya.x][Tosya.y] = mem4.value;
+
+                        Tosya.x = finalMoves[0].x;
+                        Tosya.y = finalMoves[0].y;
+
+                        lastMem2 = 3;
+                    }
+                } 
+                else {
+                    lastSeenPlayer = {0, 0};
+                }
+            }
+
+            map[Tosya.x][Tosya.y] = 'T';
+            
+            timer += logicDelay;
             canMove = false;
         }
         else {
             timer -= GetFrameTime();
             if (timer <= 0) canMove = true;
         }
+
+        // ============================================================================================
+        //                                        GAME END                                             
+        // ============================================================================================
+        if (isGameLost(Tosya, Player)) {
+            DrawGameLost();
+        }
+        if (isGameWon(mem1.value, mem2.value, lastMem)) {
+            DrawGameWon();
+        }
+
+
+        // ============================================================================================
+        //                                         DRAWING                                  
+        // ============================================================================================
+        BeginDrawing();
+            DrawMapBackground();
+            DrawMap(tosya_tx);
+            if (isGameLost(Tosya, Player)) {
+                DrawGameLost();
+            }
+            if (isGameWon(mem1.value, mem2.value, lastMem)) {
+                DrawGameWon();
+            }
         EndDrawing();
     }
     UnloadTexture(tosya_tx);
 
     CloseWindow();
-
     
     return 0;
 }
 
-void DrawTree(MAP tree, int X, int Y){
+vector<player> FindStars() {
+    vector<player> stars;
+    for (int i = 0; i < map.size(); i++) {
+        for (int j = 0; j < map[i].size(); j++) {
+            if (map[i][j] == '*'){
+                stars.push_back(player{i, j});
+            }
+        }
+    }
+
+    return stars;
+}
+
+player TosyaLookAround(float startX, float startY, float maxRange) {
+    float startAngle = 0.0f;
+    float endAngle = 360.0f;
+
+    for (float angle = startAngle; angle < endAngle; angle += 1.0f) {
+        float angleRad = angle * (M_PI / 180.0f);
+
+        float dx = cos(angleRad);
+        float dy = sin(angleRad);
+
+        float currX = startX + 0.5f;
+        float currY = startY + 0.5f;
+
+        for (float distance = 0.0f; distance < maxRange; distance += 0.5f) {
+            currX += dx * 0.5f;
+            currY += dy * 0.5f;
+
+            int mapX = static_cast<int>(currX + 0.001f);
+            int mapY = static_cast<int>(currY + 0.001f);
+
+            //checking map borders
+            if (mapY <= 0 || mapY >= map.size() - 1 || mapX <= 0 || mapX >= map[0].size() - 1 ) {
+                break;
+            }
+            
+            // checking diagonals
+            if (
+                    (map[mapY+1][mapX] == '#' && map[mapY][mapX+1] == '#') || 
+                    (map[mapY+1][mapX] == '#' && map[mapY][mapX-1] == '#') || 
+                    (map[mapY-1][mapX] == '#' && map[mapY][mapX+1] == '#') || 
+                    (map[mapY-1][mapX] == '#' && map[mapY][mapX-1] == '#')
+                ) {
+                break;
+            }
+
+            // wall check
+            if (map[mapY][mapX] == '#') {
+                break;
+            }
+            else if (map[mapY][mapX] == 'p') {
+                return { mapY, mapX };
+            }
+
+            currX += dx * 0.5f;
+            currY += dy * 0.5f;
+        }
+    }
+    return {-1, -1};
+}
+
+retBfs bfs(MAP &map, int startX, int startY, int finishX, int finishY){
+    vector<player> finalMoves;
+    vector<vector<int>> dist(map.size(), vector<int>(map[0].size(), INF));
+    vector<vector<player>> from(map.size(), vector<player>(map[0].size(), {-1, -1}));
+    queue<player> q;
+
+    dist[startY][startX] = 0;
+    q.push({ startY, startX });
+
+    vector<int> dx = { 0, 1, -1, 0 };
+    vector<int> dy = { -1, 0, 0, 1 };
+
+    while(!q.empty()) {
+        auto [y, x] = q.front();
+        q.pop();
+
+        for (int d = 0; d < dy.size(); d++) {
+            int ty = y + dy[d];
+            int tx = x + dx[d];
+
+            if (ty >= 0 && ty < map.size() && tx >= 0 && tx < map[0].size() && 
+                map[ty][tx] != '#' && dist[ty][tx] > dist[y][x] + 1) {
+                
+                dist[ty][tx] = dist[y][x] + 1;
+                from[ty][tx] = {y, x};
+                q.push({ ty, tx });
+            }
+        }
+    }
+
+    if (dist[finishY][finishX] != INF) {
+        int y = finishY;
+        int x = finishX;
+        while(x != startX || y != startY) {
+            finalMoves.push_back({ y, x });
+            auto [py, px] = from[y][x];
+            y = py;
+            x = px;
+        }
+
+        reverse(finalMoves.begin(), finalMoves.end());
+    }
+
+    return {dist[finishY][finishX], finalMoves};
+}
+
+void DrawTree(int X, int Y, bool apples, bool isLight){
     int x = X, y = Y;
-    for (const auto& row : tree) {
+    MAP tree_tmp = tree;
+    if (apples) tree_tmp = tree_apple;
+    else if (isLight) tree_tmp = tree_light;
+    
+    for (const auto& row : tree_tmp) {
         x = X;
         for (const auto& col : row) {
             if (col == ' ') {
@@ -371,7 +596,7 @@ void DrawTree(MAP tree, int X, int Y){
     }
 }
 
-void DrawStar(MAP star, int X, int Y){
+void DrawStar(int X, int Y){
     int x = X, y = Y;
     for (const auto& row : star) {
         x = X;
@@ -404,7 +629,7 @@ void DrawStar(MAP star, int X, int Y){
     }
 }
 
-void DrawSausage(MAP sausage, int X, int Y) {
+void DrawSausage(int X, int Y) {
     int x = X, y = Y;
     for (const auto& row : sausage) {
         x = X;
@@ -437,7 +662,7 @@ void DrawSausage(MAP sausage, int X, int Y) {
     }
 }
 
-void DrawUpwardPortal(MAP portal_half, int X, int Y) {
+void DrawUpwardPortal(int X, int Y) {
  // same, as Downward Portal, but flipped upside down
     int x = X+31, y = Y+32;
     for (const auto& row : portal_half) {
@@ -476,7 +701,7 @@ void DrawUpwardPortal(MAP portal_half, int X, int Y) {
 
 }
 
-void DrawDownwardPortal(MAP portal_half, int X, int Y){
+void DrawDownwardPortal(int X, int Y){
     int x = X, y = Y;
     for (const auto& row : portal_half) {
         x = X;
@@ -513,7 +738,7 @@ void DrawDownwardPortal(MAP portal_half, int X, int Y){
     }
 }
 
-void DrawGrassUnderTree(MAP grass, int X, int Y) {
+void DrawGrassUnderTree(int X, int Y) {
     int x = X, y = Y;
     for (const auto& row : grass) {
         x = X;
@@ -550,10 +775,11 @@ void DrawGrassUnderTree(MAP grass, int X, int Y) {
     }
 }
 
-void DrawGrass(MAP grass, MAP grass_flowers, int X, int Y, bool flowers) {
+void DrawGrass(int X, int Y, bool flowers) {
     int x = X, y = Y;
-    if (flowers) grass = grass_flowers;
-    for (const auto& row : grass) {
+    MAP grass_tmp = grass;
+    if (flowers) grass_tmp = grass_flowers;
+    for (const auto& row : grass_tmp) {
         x = X;
         for (const auto& col : row) {
             if (col == ' ') {
@@ -598,7 +824,7 @@ void DrawGrass(MAP grass, MAP grass_flowers, int X, int Y, bool flowers) {
     }
 }
 
-void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sausage, MAP grass, MAP grass_flowers, MAP grass_tree, MAP portal_half, Texture2D tosya_tx) {
+void DrawMap(Texture2D tosya_tx) {
     int x = 0, y = 0;
 
     for (int i = 0; i < map.size(); i++) {
@@ -612,28 +838,30 @@ void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sa
             if (col == ' ') {
                 x += 32;
             }
-            
             else if (col == '#') {
-                DrawTree(tree, x, y);
+                srand(y - x - (y^(y/4)) * 771);
+                bool variation = ((rand() % 3) + 1) < 3 ? false : true;
+
+                DrawTree(x, y, variation, false);
                 x += 32;
             }
             else if (col == 'a') {
-                DrawTree(tree_apple, x, y);
+                DrawTree(x, y, true, false);
                 x += 32;
             }
             else if (col == '%') {
-                DrawTree(tree_light, x, y);
+                DrawTree(x, y, false, true);
                 x += 32;
             }
             else if (col == '*') {
-                DrawStar(star, x, y);
+                DrawStar(x, y);
                 x += 32;
             }
             else if (col == 't') {
                 x += 32;
             }
             else if (col == 'p') {
-                DrawSausage(sausage, x, y);
+                DrawSausage(x, y);
                 x+=32;
             }
             else if (col == 'T') {
@@ -645,7 +873,7 @@ void DrawMap(MAP map, MAP tree, MAP tree_light, MAP tree_apple, MAP star, MAP sa
     }
 }
 
-void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_flowers, MAP portal_half) {
+void DrawMapBackground() {
     int x = 0, y = 0;
     for (int i = 0; i < map_background.size(); i++) {
 
@@ -661,30 +889,54 @@ void DrawMapBackground(MAP map_background, MAP grass, MAP grass_tree, MAP grass_
                 srand(y + x + y^y/4);
                 bool variation = ((rand() % 4) + 1) < 4 ? false : true;
 
-                DrawGrass(grass, grass_flowers, x, y, variation);
+                DrawGrass(x, y, variation);
                 x += 32;
             }
             else if (col == 't') {
-                DrawGrassUnderTree(grass_tree, x, y);
+                DrawGrassUnderTree(x, y);
                 x += 32;
             }
             else if (col == 'u') {
-                srand(y + x + y^y/4);
-                bool variation = ((rand() % 4) + 1) < 4 ? false : true;
-
-                DrawGrass(grass, grass_flowers, x, y, variation);
-                DrawUpwardPortal(portal_half, x, y);
+                DrawGrass(x, y, false);
+                DrawUpwardPortal(x, y);
                 x += 32;
             }
             else if (col == 'd') {
                 srand(y + x + y^y/4);
                 bool variation = ((rand() % 4) + 1) < 4 ? false : true;
 
-                DrawGrass(grass, grass_flowers, x, y, variation);
-                DrawDownwardPortal(portal_half, x, y);
+                DrawGrass(x, y, variation);
+                DrawDownwardPortal(x, y);
                 x += 32;
             }
         }
         y += 32;
     }
+}
+
+bool isGameLost(player Tosya, player Player) {
+    if (Tosya.x == Player.x && Tosya.y == Player.y) {
+        return true;
+    }
+    return false;
+}
+
+bool isGameWon(char mem1, char mem2, int lastMem) {
+    if (lastMem == 1 && mem1 == 't') {
+        return true;
+    } 
+    else if (lastMem == 2 && mem2 == 't') {
+        return true;
+    }
+    return false;
+}
+
+void DrawGameLost() {
+    DrawRectangle(10*32, 6*32, 12*32, 7*32, Color{181, 57, 67, 255});
+    DrawText("get fucked", 13*32, 9*32, 32, DARKGRAY);
+}
+
+void DrawGameWon() {
+    DrawRectangle(10*32, 6*32, 12*32, 7*32, Color{122, 190, 70, 255});
+    DrawText("you won!", 14*32, 9*32, 32, DARKGRAY);
 }
